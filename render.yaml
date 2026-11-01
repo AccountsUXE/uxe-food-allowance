@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: uxe-food-allowance
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ACCESS_CODE
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: uxe-food-kv
+          property: connectionString
+  - type: keyvalue
+    name: uxe-food-kv
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
