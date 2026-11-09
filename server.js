@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const redis = require('redis');
 
 const PORT = process.env.PORT || 10000;
@@ -8,9 +9,15 @@ const PORT = process.env.PORT || 10000;
 const ACCESS_CODE = (process.env.ACCESS_CODE || 'change-me').trim();
 const REDIS_URL = process.env.REDIS_URL || process.env.KEY_VALUE_URL || '';
 
+// index.html may be in ./public or at the repo root (flat upload) — support both.
+const PUBLIC_DIR = fs.existsSync(path.join(__dirname, 'public', 'index.html'))
+  ? path.join(__dirname, 'public')
+  : __dirname;
+const INDEX_FILE = path.join(PUBLIC_DIR, 'index.html');
+
 const app = express();
 app.use(express.json({ limit: '4mb' }));
-app.use(express.static(path.join(__dirname, 'public'), { index: 'index.html' }));
+app.get('/', (req, res) => res.sendFile(INDEX_FILE));
 
 // ---- Redis (Render Key Value) with lazy connect + reconnect ----
 let client = null, ready = false;
@@ -31,6 +38,10 @@ async function getClient() {
 
 const SIG = (no) => 'sig:' + no;
 const APPR = 'config:approvers';
+
+// ---- new single-signature categories (Volunteer Food stays on sig:* untouched) ----
+const CAT_PREFIX = { salary: 'sal:', empfood: 'ef:', emprewards: 'er:' };
+const catKey = (cat, key) => CAT_PREFIX[cat] + key;
 
 // ---- auth ----
 function checkCode(req) {
@@ -121,7 +132,61 @@ app.post('/api/approver', async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'server' }); }
 });
 
+// ---- single-signature category data (salary / empfood / emprewards) ----
+app.get('/api/cat/:cat/data', async (req, res) => {
+  const prefix = CAT_PREFIX[req.params.cat];
+  if (!prefix) return res.status(404).json({ error: 'unknown category' });
+  try {
+    const c = await getClient();
+    const progress = {};
+    for await (const k of c.scanIterator({ MATCH: prefix + '*', COUNT: 100 })) {
+      const key = k.slice(prefix.length);
+      const raw = await c.get(k);
+      if (!raw) continue;
+      let doc; try { doc = JSON.parse(raw); } catch (e) { continue; }
+      if (doc && doc.sig && doc.sig.img) progress[key] = { signed: true, ts: doc.sig.ts };
+    }
+    let approvers = {};
+    const ar = await c.get(APPR);
+    if (ar) { try { approvers = JSON.parse(ar); } catch (e) {} }
+    res.json({ progress, approvers });
+  } catch (e) { res.status(500).json({ error: 'server', detail: e.message }); }
+});
+
+app.get('/api/cat/:cat/sig/:key', async (req, res) => {
+  const prefix = CAT_PREFIX[req.params.cat];
+  if (!prefix) return res.status(404).json({ error: 'unknown category' });
+  try {
+    const c = await getClient();
+    const raw = await c.get(catKey(req.params.cat, req.params.key));
+    const doc = raw ? JSON.parse(raw) : {};
+    res.json(doc && doc.sig ? doc.sig : {});
+  } catch (e) { res.status(500).json({ error: 'server' }); }
+});
+
+app.post('/api/cat/:cat/sign/:key', async (req, res) => {
+  const prefix = CAT_PREFIX[req.params.cat];
+  if (!prefix) return res.status(404).json({ error: 'unknown category' });
+  try {
+    const { img } = req.body || {};
+    if (!img) return res.status(400).json({ error: 'img required' });
+    const c = await getClient();
+    await c.set(catKey(req.params.cat, req.params.key), JSON.stringify({ sig: { img, ts: new Date().toISOString() } }));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'server', detail: e.message }); }
+});
+
+app.post('/api/cat/:cat/unsign/:key', async (req, res) => {
+  const prefix = CAT_PREFIX[req.params.cat];
+  if (!prefix) return res.status(404).json({ error: 'unknown category' });
+  try {
+    const c = await getClient();
+    await c.del(catKey(req.params.cat, req.params.key));
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: 'server' }); }
+});
+
 app.get('/healthz', (req, res) => res.json({ ok: true, redis: ready }));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('*', (req, res) => res.sendFile(INDEX_FILE));
 
 app.listen(PORT, () => console.log('listening on ' + PORT));

@@ -302,6 +302,21 @@ details.dash[open]>summary .chev{transform:rotate(90deg)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 /* login gate */
 #loginOv .modal{max-width:380px}
+.menu-h{font-size:14px;font-weight:700;color:var(--ink);margin:4px 2px 14px;letter-spacing:.2px}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.menu-grid{grid-template-columns:1fr}}
+.cat-card{position:relative;text-align:left;background:#fff;border:1px solid var(--hair);border-radius:16px;padding:18px 18px 16px;cursor:pointer;transition:.15s;overflow:hidden;box-shadow:0 1px 2px rgba(19,36,79,.04)}
+.cat-card:hover{border-color:var(--orange);box-shadow:0 6px 20px rgba(19,36,79,.10);transform:translateY(-1px)}
+.cat-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--orange)}
+.cat-card .cc-top{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.cat-card .cc-ico{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.cat-card .cc-name{font-size:15.5px;font-weight:800;color:var(--ink);line-height:1.15}
+.cat-card .cc-sub{font-size:11.5px;color:var(--grey);margin-top:2px}
+.cat-card .cc-meta{display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px solid var(--hair)}
+.cat-card .cc-meta div{font-size:11px;color:var(--grey)}
+.cat-card .cc-meta b{display:block;font-size:15px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+.cat-card .cc-tag{position:absolute;top:14px;right:14px;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--good);background:rgba(31,138,82,.1);padding:3px 8px;border-radius:20px}
+.cat-card .cc-tag.one{color:var(--orange);background:rgba(240,128,24,.12)}
 #codeInp{width:100%;border:1.5px solid var(--line-strong);background:var(--bg);color:var(--ink);
   border-radius:11px;padding:12px 14px;font-size:17px;font-family:inherit;letter-spacing:.04em}
 #codeInp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-weak)}
@@ -318,14 +333,15 @@ details.dash[open]>summary .chev{transform:rotate(90deg)}
         <span class="div"></span>
         <span class="ss"><b>SECURITY</b><span>SOLUTIONS</span></span>
       </div>
+      <button class="gearbtn" id="back" title="Back to categories" aria-label="Back to categories" hidden>‹</button>
       <div class="titleblock">
-        <h1>Food Allowance Voucher</h1>
-        <span class="sub">Emarat Al Aman · 2–5 Nov 2026 · AED 80/day</span>
+        <h1 id="barTitle">Emarat Al Aman</h1>
+        <span class="sub" id="barSub">Payment Vouchers · 2–5 Nov 2026</span>
       </div>
-      <button class="gearbtn" id="gear" title="Approver signatures" aria-label="Settings">⚙</button>
+      <button class="gearbtn" id="gear" title="Approver signatures" aria-label="Settings" hidden>⚙</button>
       <button class="gearbtn" id="logout" title="Log out" aria-label="Log out">⏻</button>
     </div>
-    <div class="bar-ctrl">
+    <div class="bar-ctrl" id="foodCtrl" hidden>
       <div class="pills" id="dayPills"></div>
       <span class="spacer"></span>
       <label class="toggle"><input type="checkbox" id="pendingOnly"><span>Pending only</span></label>
@@ -334,7 +350,37 @@ details.dash[open]>summary .chev{transform:rotate(90deg)}
   </div>
 </div>
 
-<div class="wrap">
+<!-- ===== Category menu ===== -->
+<div class="wrap" id="menu" hidden>
+  <div class="menu-h">Choose a voucher category</div>
+  <div class="menu-grid" id="menuGrid"></div>
+</div>
+
+<!-- ===== Single-signature category app ===== -->
+<div class="wrap" id="catApp" hidden>
+  <div class="notice" id="catNotice"></div>
+  <section class="picker">
+    <div class="picker-h"><span class="lbl" id="catPickLbl">Select person</span><span class="cnt" id="catCount"></span></div>
+    <div class="search">
+      <span class="ico">⌕</span>
+      <input id="catSearch" type="text" inputmode="search" autocomplete="off" placeholder="Search name or ID…" aria-label="Search">
+      <button class="clr" id="catClr" aria-label="Clear">×</button>
+    </div>
+    <div class="list" id="catList" role="listbox"></div>
+  </section>
+  <div id="catVoucherWrap"></div>
+  <details class="dash" id="catDash">
+    <summary>Progress &amp; payout <span class="chev">›</span></summary>
+    <div class="dash-body">
+      <div class="paysum" style="margin-top:0">
+        <span class="k" id="catDashK">Signed vouchers</span>
+        <span class="amt" id="catPayTotal">AED 0</span>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="wrap" id="foodApp">
   <div class="notice" id="notice"></div>
 
   <section class="picker">
@@ -461,6 +507,16 @@ var state={progress:{},sigs:{},selected:null,day:null,pendingOnly:false,
 var M365="Microsoft 365";
 var curSigs=null; // sigs for currently open voucher (loaded fresh)
 var $=function(s){return document.querySelector(s)};
+/* ---------------- categories data ---------------- */
+var CAT_PEOPLE={"salary":[{"key":"EAA-PY-0084","no":"EAA-PY-0084","name":"Abdallah Nader Abdel Razzaq Aljabali","eid":"784-2005-7583082-1","amount":2500},{"key":"EAA-PY-0085","no":"EAA-PY-0085","name":"Adam Bassam Mohammad Bashtawi","eid":"784-2002-4365919-8","amount":2500},{"key":"EAA-PY-0086","no":"EAA-PY-0086","name":"Amir Mehrdad Badakhsh","eid":"784-2002-4624238-0","amount":2500},{"key":"EAA-PY-0087","no":"EAA-PY-0087","name":"Aryam Mohamed Samer Barbour","eid":"784-2006-6824173-8","amount":2500},{"key":"EAA-PY-0088","no":"EAA-PY-0088","name":"Azal Ihsan Alzaidi","eid":"784-2004-6052503-1","amount":2500},{"key":"EAA-PY-0117","no":"EAA-PY-0117","name":"Dilawar","eid":"","amount":0},{"key":"EAA-PY-0089","no":"EAA-PY-0089","name":"Diya Mitesh Rathod","eid":"784-2006-1817393-2","amount":2500},{"key":"EAA-PY-0090","no":"EAA-PY-0090","name":"Farah El Hamoumy","eid":"784-2007-3180718-4","amount":2250},{"key":"EAA-PY-0091","no":"EAA-PY-0091","name":"Farhang Yezdi Turel Yezdi Noshir Turel","eid":"784-2002-7515122-1","amount":2500},{"key":"EAA-PY-0092","no":"EAA-PY-0092","name":"Ghanem Mahmoud Kamal Mohamed Ahmed","eid":"784-2004-7948529-2","amount":2500},{"key":"EAA-PY-0093","no":"EAA-PY-0093","name":"Hala Fouad Abou Kaf","eid":"784-2005-1964840-4","amount":2500},{"key":"EAA-PY-0094","no":"EAA-PY-0094","name":"Hamza Mohd Hamzeh Alzyoudi","eid":"784-2007-0548140-4","amount":2500},{"key":"EAA-PY-0095","no":"EAA-PY-0095","name":"Haydi Abdelhamid Elabd Mohamed Mashali","eid":"784-2005-8243657-0","amount":2500},{"key":"EAA-PY-0096","no":"EAA-PY-0096","name":"Ishan Mathilakath Noorudeen","eid":"784-2006-3062497-9","amount":2500},{"key":"EAA-PY-0097","no":"EAA-PY-0097","name":"Jaden Valen Pinto","eid":"784-2006-7063274-2","amount":2500},{"key":"EAA-PY-0098","no":"EAA-PY-0098","name":"Joanne Omar Saeed Al Mahdi","eid":"784-2004-2853685-6","amount":2500},{"key":"EAA-PY-0099","no":"EAA-PY-0099","name":"Karam Muhanad Alhakim","eid":"784-2006-6250250-7","amount":2500},{"key":"EAA-PY-00100","no":"EAA-PY-00100","name":"Karim Tarek Ahmed Elsayed Hassan","eid":"784-2001-5740859-0","amount":2500},{"key":"EAA-PY-00101","no":"EAA-PY-00101","name":"Mahmood Jawdet Ayoub","eid":"784-2001-2732841-5","amount":2500},{"key":"EAA-PY-00102","no":"EAA-PY-00102","name":"Moataz Mohamed Abdelhakim Mabrouk Mohamed","eid":"784-2003-8054836-0","amount":2500},{"key":"EAA-PY-0103","no":"EAA-PY-0103","name":"Mobina Tayeb Ranjbar","eid":"784-2004-9054321-0","amount":2500},{"key":"EAA-PY-0104","no":"EAA-PY-0104","name":"Mohamed Ahmed Kamel Ibrahim","eid":"784-2002-4029521-0","amount":2500},{"key":"EAA-PY-0105","no":"EAA-PY-0105","name":"Mohamed Hossam Abouelmaati Aboutaleb","eid":"784-2001-7918486-4","amount":2000},{"key":"EAA-PY-0106","no":"EAA-PY-0106","name":"Mohammad Nussair - UXE","eid":"784-1988-9154680-0","amount":2500},{"key":"EAA-PY-0107","no":"EAA-PY-0107","name":"Mohammed Mazin Faik Abu Sin","eid":"784-2004-7385719-9","amount":2500},{"key":"EAA-PY-0108","no":"EAA-PY-0108","name":"Omar Khaled Gh Abu Alhaija","eid":"784-2004-3279515-9","amount":3000},{"key":"EAA-PY-0109","no":"EAA-PY-0109","name":"Rashed Ahmad Khaleel Alkafaween","eid":"784-1993-4684807-2","amount":3000},{"key":"EAA-PY-0110","no":"EAA-PY-0110","name":"Rashid Abdalla Mustafa Abdalla","eid":"784-2002-0874641-0","amount":3000},{"key":"EAA-PY-0111","no":"EAA-PY-0111","name":"Rashid Alkatheeri","eid":"784-2003-0964162-7","amount":2500},{"key":"EAA-PY-0112","no":"EAA-PY-0112","name":"Reem Banchi","eid":"784-2004-4806902-9","amount":3500},{"key":"EAA-PY-0113","no":"EAA-PY-0113","name":"RIM EL MAHJOUBI","eid":"784-2005-6573156-7","amount":3500},{"key":"EAA-PY-0114","no":"EAA-PY-0114","name":"Saif Ansari","eid":"784-2001-1791474-5","amount":2500},{"key":"EAA-PY-0115","no":"EAA-PY-0115","name":"Tala Ahmed Hammoud","eid":"784-2007-1062154-9","amount":2500},{"key":"EAA-PY-0116","no":"EAA-PY-0116","name":"Tanushree Harshad Badbe Harshad Sakharam Bade","eid":"784-2006-4970686-6","amount":2500},{"key":"EAA-PY-0116-2","no":"EAA-PY-0116","name":"Youssef Abdelfattah Sayed Ahmed Abdelfattah","eid":"784-2005-3176241-5","amount":3000}],"empfood":[{"key":"EAA-PY-0044","no":"EAA-PY-0044","name":"Abdulkader Mohamad Shehadeh","eid":"784-1993-6386491-1","amount":1600},{"key":"EAA-PY-0083","no":"EAA-PY-0083","name":"Abdulla Juma AlSuwaidi","eid":"784-1993-6391946-7","amount":0},{"key":"EAA-PY-0046","no":"EAA-PY-0046","name":"Abdullah Zulfekar Ali","eid":"784-1993-6576140-4","amount":1600},{"key":"EAA-PY-0047","no":"EAA-PY-0047","name":"Abir Al May","eid":"784-1989-3135298-7","amount":1200},{"key":"EAA-PY-0048","no":"EAA-PY-0048","name":"Ahmed Abdelmahmoud Mohamed Abdelrahman","eid":"784-1984-3515073-9","amount":1000},{"key":"EAA-PY-0049","no":"EAA-PY-0049","name":"Ahmed Hashim AbdelGadir Abdelrahman","eid":"784-1994-6461040-3","amount":800},{"key":"EAA-PY-0072","no":"EAA-PY-0072","name":"Ahmed Mamdouh","eid":"784-1992-7657920-0","amount":400},{"key":"EAA-PY-0050","no":"EAA-PY-0050","name":"Ala Ibrahim Yousef Rababa","eid":"784-1987-4835385-5","amount":1200},{"key":"EAA-PY-0053","no":"EAA-PY-0053","name":"Amjad Hussain Syed","eid":"784-1974-5485919-6","amount":400},{"key":"EAA-PY-0054","no":"EAA-PY-0054","name":"Anas Aref","eid":"784-1990-4816576-7","amount":800},{"key":"EAA-PY-0055","no":"EAA-PY-0055","name":"Ansheena Peter","eid":"784-1986-8741320-7","amount":100},{"key":"EAA-PY-0075","no":"EAA-PY-0075","name":"Ayman Obeid","eid":"784-1992-6942728-4","amount":0},{"key":"EAA-PY-0056","no":"EAA-PY-0056","name":"Bassam Youssef Abdelaal Ibrahim","eid":"784-1989-7421929-1","amount":1200},{"key":"EAA-PY-0057","no":"EAA-PY-0057","name":"Binoj Gurung","eid":"784-1994-9829175-8","amount":600},{"key":"EAA-PY-0058","no":"EAA-PY-0058","name":"Fatima Maarrouf Badr","eid":"784-1997-1722532-2","amount":900},{"key":"EAA-PY-0052","no":"EAA-PY-0052","name":"Fatima Mohamed Al Dhuhoori","eid":"784-1992-0216847-4","amount":600},{"key":"EAA-PY-0082","no":"EAA-PY-0082","name":"Jamal Abdulla Alamri","eid":"","amount":0},{"key":"EAA-PY-0051","no":"EAA-PY-0051","name":"Jasna Basheer","eid":"784-1991-5460486-4","amount":500},{"key":"EAA-PY-0076","no":"EAA-PY-0076","name":"Khaled Ibrahim Mohamed Gad","eid":"784-1993-6294745-1","amount":0},{"key":"EAA-PY-0081","no":"EAA-PY-0081","name":"Khaled Sabil Hussain Alblooshi","eid":"784-1980-5316309-7","amount":0},{"key":"EAA-PY-0073","no":"EAA-PY-0073","name":"Mahmoud Magdy Mohamed Khalil Abdrabo","eid":"784-1998-6068897-9","amount":300},{"key":"EAA-PY-0079","no":"EAA-PY-0079","name":"Maitha Abdulla Mohamed Saleh Alremeithi","eid":"784-1994-4683282-8","amount":0},{"key":"EAA-PY-0078","no":"EAA-PY-0078","name":"Manal Saleh Ali Obaid Al Hammadi","eid":"784-1994-4183987-7","amount":0},{"key":"EAA-PY-0059","no":"EAA-PY-0059","name":"Mark Joseph Solleza Azul","eid":"784-1987-1984268-8","amount":300},{"key":"EAA-PY-0080","no":"EAA-PY-0080","name":"Mhd Rami Mhd Saleh Hassan","eid":"784-1981-5272146-4","amount":0},{"key":"EAA-PY-0060","no":"EAA-PY-0060","name":"Mohamed Ishraf","eid":"784-1995-7205853-7","amount":500},{"key":"EAA-PY-0061","no":"EAA-PY-0061","name":"Mohammed Mudassar Syed Syed Zaheer","eid":"784-1997-5313189-7","amount":1600},{"key":"EAA-PY-0062","no":"EAA-PY-0062","name":"Muhammad Sajawal Jillani Muhammad Khalid","eid":"784-2003-6232744-5","amount":400},{"key":"EAA-PY-0063","no":"EAA-PY-0063","name":"Noushad Vazha Valappil Abdulla Thayyil","eid":"784-1995-8875705-6","amount":100},{"key":"EAA-PY-0064","no":"EAA-PY-0064","name":"Presley Samson Rodrigues Paul Novel Rodrigues","eid":"784-2000-4247928-5","amount":500},{"key":"EAA-PY-0065","no":"EAA-PY-0065","name":"Ramy Abdelmohssen Abdelhamid Radwan","eid":"784-1984-5395375-8","amount":1600},{"key":"EAA-PY-0045","no":"EAA-PY-0045","name":"Riham Msbah AlMagarby","eid":"784-1995-9098075-3","amount":400},{"key":"EAA-PY-0066","no":"EAA-PY-0066","name":"Rinish Wilson Wilson","eid":"784-1993-8817439-5","amount":0},{"key":"EAA-PY-0067","no":"EAA-PY-0067","name":"Saleh Qaid Saleh Al-Ruqimi","eid":"784-1997-5740298-9","amount":500},{"key":"EAA-PY-0074","no":"EAA-PY-0074","name":"Sally Sayed Fahmi Hassan Elsheikh","eid":"784-1982-5707910-7","amount":600},{"key":"EAA-PY-0068","no":"EAA-PY-0068","name":"Sami Nasser Awad Ayyoub","eid":"784-1988-1814725-2","amount":1000},{"key":"EAA-PY-0077","no":"EAA-PY-0077","name":"Shamma Khalid Mohammad Sulaiman Almemari","eid":"784-1999-1935949-9","amount":0},{"key":"EAA-PY-0069","no":"EAA-PY-0069","name":"Shamsa Khalifa Salem Mohammad Alkendi","eid":"784-2001-4263683-4","amount":400},{"key":"EAA-PY-0070","no":"EAA-PY-0070","name":"Shibin Madassery","eid":"784-1988-6617380-4","amount":0},{"key":"EAA-PY-0071","no":"EAA-PY-0071","name":"Unnikrishnan Ramanathan","eid":"784-1991-8040518-7","amount":400}],"emprewards":[{"key":"EAA-PY-0145","no":"EAA-PY-0145","name":"Abdullah Zulfekar","eid":"","amount":2000},{"key":"EAA-PY-0129","no":"EAA-PY-0129","name":"Abir Almay","eid":"","amount":4000},{"key":"EAA-PY-0130","no":"EAA-PY-0130","name":"Ahmed Abdelmahmoud","eid":"","amount":4000},{"key":"EAA-PY-0140","no":"EAA-PY-0140","name":"Ahmed Hashim","eid":"","amount":2000},{"key":"EAA-PY-0128","no":"EAA-PY-0128","name":"Ala Ibrahim","eid":"","amount":4000},{"key":"EAA-PY-0144","no":"EAA-PY-0144","name":"Amjad Hussain","eid":"","amount":2000},{"key":"EAA-PY-0126","no":"EAA-PY-0126","name":"Anas Aref","eid":"","amount":4000},{"key":"EAA-PY-0127","no":"EAA-PY-0127","name":"Bassam Youssef","eid":"","amount":4000},{"key":"EAA-PY-0139","no":"EAA-PY-0139","name":"Binoj Gurung","eid":"","amount":3000},{"key":"EAA-PY-0142","no":"EAA-PY-0142","name":"Fatima Aldhuhoori","eid":"","amount":2000},{"key":"EAA-PY-0136","no":"EAA-PY-0136","name":"Harish Kumar","eid":"","amount":3000},{"key":"EAA-PY-0137","no":"EAA-PY-0137","name":"Jasna Basheer","eid":"","amount":3000},{"key":"EAA-PY-0135","no":"EAA-PY-0135","name":"Khalid Gad","eid":"","amount":3000},{"key":"EAA-PY-0146","no":"EAA-PY-0146","name":"Mark Joseph","eid":"","amount":2000},{"key":"EAA-PY-0133","no":"EAA-PY-0133","name":"Mohamed Ishraf","eid":"","amount":4000},{"key":"EAA-PY-0143","no":"EAA-PY-0143","name":"Noushad Vazha Valappil","eid":"","amount":2000},{"key":"EAA-PY-0147","no":"EAA-PY-0147","name":"Presley Rodrigues","eid":"","amount":2000},{"key":"EAA-PY-0132","no":"EAA-PY-0132","name":"Ramesh Jeyaraman","eid":"","amount":4000},{"key":"EAA-PY-0131","no":"EAA-PY-0131","name":"Ramy Radwan","eid":"","amount":5000},{"key":"EAA-PY-0149","no":"EAA-PY-0149","name":"Rinish Wilson","eid":"","amount":2000},{"key":"EAA-PY-0138","no":"EAA-PY-0138","name":"Saleh Al-Ruqimi","eid":"","amount":3000},{"key":"EAA-PY-0134","no":"EAA-PY-0134","name":"Sally ElSheikh","eid":"","amount":4000},{"key":"EAA-PY-0141","no":"EAA-PY-0141","name":"Shibin Madassery","eid":"","amount":2000},{"key":"EAA-PY-0148","no":"EAA-PY-0148","name":"Unnikrishnan Ramanathan","eid":"","amount":2000}]};
+var CATS={
+  food:{id:'food',label:'Volunteer Food',sub:'Daily food allowance',signer:'Volunteer',mode:'daily',icon:'\u{1F37D}',tag:'Live',tagType:'done'},
+  salary:{id:'salary',label:'Volunteer Salary',sub:'Training & event allowance',signer:'Volunteer',mode:'single',icon:'\u{1F4B5}',tag:'1 signature',tagType:'one',title:'Salary Allowance Voucher',titleUp:'SALARY ALLOWANCE VOUCHER',section:'Salary Allowance',descr:'Salary allowance for participation in the Emarat Al Aman event.'},
+  empfood:{id:'empfood',label:'Employee Food',sub:'Food allowance',signer:'Employee',mode:'single',icon:'\u{1F371}',tag:'1 signature',tagType:'one',title:'Food Allowance Voucher',titleUp:'FOOD ALLOWANCE VOUCHER',section:'Food Allowance',descr:'Food allowance for the Emarat Al Aman event.'},
+  emprewards:{id:'emprewards',label:'Employee Rewards',sub:'Reward payment',signer:'Employee',mode:'single',icon:'\u{1F3C5}',tag:'1 signature',tagType:'one',title:'Reward Voucher',titleUp:'REWARD VOUCHER',section:'Reward',descr:'Reward for contribution to the Emarat Al Aman event.'}
+};
+var CAT_ORDER=['food','salary','empfood','emprewards'];
+
 function toast(msg,err){var t=$("#toast");t.textContent=msg;t.className="toast show"+(err?" err":"");clearTimeout(t._t);t._t=setTimeout(function(){t.className="toast";},err?3200:2200);}
 
 /* today within event? */
@@ -1070,6 +1126,327 @@ function saveAllToM365(){
   }).then(function(){toast("Uploaded "+ok+" voucher"+(ok===1?"":"s")+(fail?(", "+fail+" failed"):"")+" to "+state.dest.name+(fail?"":" ✓"),fail>0);});
 }
 
+/* ================= Category menu + single-signature engine ================= */
+var scat=null; /* current single-sig category object */
+var sstate={people:[],progress:{},selected:null,sigs:{},curSig:null,search:"",poll:null};
+
+function catSum(id){var p=CAT_PEOPLE[id]||[];var t=0;p.forEach(function(x){t+=x.amount||0;});return t;}
+function catCount(id){return id==="food"?VOLS.length:(CAT_PEOPLE[id]||[]).length;}
+
+function showMenu(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  cStopPoll();
+  state.selected=null;sstate.selected=null;
+  $("#foodApp").hidden=true;$("#catApp").hidden=true;$("#foodCtrl").hidden=true;
+  $("#gear").hidden=true;$("#back").hidden=true;
+  $("#barTitle").textContent="Emarat Al Aman";
+  $("#barSub").textContent="Payment Vouchers · Select a category";
+  renderMenu();
+  $("#menu").hidden=false;
+  window.scrollTo(0,0);
+}
+function renderMenu(){
+  var g=$("#menuGrid");g.innerHTML="";
+  CAT_ORDER.forEach(function(id){
+    var c=CATS[id];var card=document.createElement("button");card.className="cat-card";card.type="button";
+    var metaRight=id==="food"
+      ? '<div>Rate<b>AED 80<span style="font-size:10px;font-weight:600">/day</span></b></div>'
+      : '<div>Total<b>AED '+catSum(id).toLocaleString("en-US")+'</b></div>';
+    card.innerHTML=
+      '<span class="cc-tag'+(c.tagType==="one"?" one":"")+'">'+c.tag+'</span>'+
+      '<div class="cc-top"><div class="cc-ico">'+c.icon+'</div>'+
+        '<div><div class="cc-name">'+c.label+'</div><div class="cc-sub">'+c.sub+'</div></div></div>'+
+      '<div class="cc-meta"><div>'+(c.signer==="Employee"?"Employees":"Volunteers")+'<b>'+catCount(id)+'</b></div>'+metaRight+'</div>';
+    card.onclick=function(){ id==="food"?enterFood():enterCat(id); };
+    g.appendChild(card);
+  });
+}
+function enterFood(){
+  $("#menu").hidden=true;$("#catApp").hidden=true;
+  $("#foodApp").hidden=false;$("#foodCtrl").hidden=false;$("#gear").hidden=false;$("#back").hidden=false;
+  $("#barTitle").textContent="Volunteer Food";
+  $("#barSub").textContent="Emarat Al Aman · 2–5 Nov 2026 · AED 80/day";
+  window.scrollTo(0,0);
+  loadData();startPoll();
+}
+
+/* ---------- single-signature category ---------- */
+function enterCat(id){
+  scat=CATS[id];
+  sstate.people=(CAT_PEOPLE[id]||[]).slice();
+  sstate.progress={};sstate.sigs={};sstate.selected=null;sstate.curSig=null;sstate.search="";
+  $("#menu").hidden=true;$("#foodApp").hidden=true;$("#foodCtrl").hidden=true;$("#gear").hidden=false;
+  $("#catApp").hidden=false;$("#back").hidden=false;
+  $("#barTitle").textContent=scat.label;
+  $("#barSub").textContent="Emarat Al Aman · "+scat.title;
+  $("#catPickLbl").textContent="Select "+scat.signer.toLowerCase();
+  $("#catSearch").value="";$("#catVoucherWrap").style.display="none";
+  $("#catNotice").className="notice";
+  cRenderList();cRenderDash();
+  window.scrollTo(0,0);
+  cLoad();cStartPoll();
+}
+function cStartPoll(){cStopPoll();sstate.poll=setInterval(cLoad,15000);}
+function cStopPoll(){if(sstate.poll){clearInterval(sstate.poll);sstate.poll=null;}}
+function cApi(method,path,body){return api(method,"/api/cat/"+scat.id+path,body);}
+function cLoad(){
+  return cApi("GET","/data").then(function(d){
+    $("#catNotice").className="notice";
+    sstate.progress=(d&&d.progress)||{};state.approvers=(d&&d.approvers)||{};
+    cRenderList();cRenderDash();
+    if(sstate.selected){var p=cFind(sstate.selected);if(p)cRenderVoucher(p,false);}
+  }).catch(function(e){
+    if(e&&e.code==="unauthorized"){logout();return;}
+    var n=$("#catNotice");n.className="notice show warn";n.innerHTML="⚠ Can't reach the server right now — it will retry automatically.";
+  });
+}
+function cFind(key){return sstate.people.find(function(x){return x.key===key});}
+function cSignedCount(){var n=0;sstate.people.forEach(function(p){if(sstate.progress[p.key])n++;});return n;}
+function cRenderList(){
+  var list=$("#catList");if(!list)return;list.innerHTML="";
+  var q=($("#catSearch").value||"").trim().toLowerCase();
+  var matches=sstate.people.filter(function(p){
+    if(!q)return true;return(p.name.toLowerCase().indexOf(q)>=0)||(p.eid&&p.eid.toLowerCase().indexOf(q)>=0);
+  });
+  $("#catCount").textContent=matches.length+" of "+sstate.people.length;
+  $("#catClr").style.display=q?"grid":"none";
+  if(!matches.length){list.innerHTML='<div class="empty">No matches for “'+esc($("#catSearch").value)+'”.</div>';return;}
+  matches.forEach(function(p){
+    var done=!!sstate.progress[p.key];
+    var btn=document.createElement("button");btn.className="row";btn.type="button";btn.setAttribute("role","option");
+    btn.setAttribute("aria-selected",sstate.selected===p.key?"true":"false");
+    var idline=p.eid?(esc(p.no)+" · "+esc(p.eid)):esc(p.no);
+    btn.innerHTML='<span class="av">'+initials(p.name)+'</span>'+
+      '<span class="meta"><span class="nm">'+esc(p.name)+'</span><span class="id tnum">'+idline+'</span></span>'+
+      '<span class="dots"><span class="dot'+(done?" on":"")+'" title="'+(done?"signed":"pending")+'"></span></span>';
+    btn.onclick=function(){cSelect(p.key)};
+    list.appendChild(btn);
+  });
+}
+function cSelect(key){
+  sstate.selected=key;cRenderList();
+  var p=cFind(key);sstate.curSig=null;
+  var w=$("#catVoucherWrap");w.style.display="block";
+  cRenderVoucher(p,true);
+  cApi("GET","/sig/"+encodeURIComponent(key)).then(function(d){
+    sstate.curSig=(d&&d.img)?d:null;sstate.sigs[key]=sstate.curSig;
+    if(sstate.selected===key)cRenderVoucher(p,false);
+  }).catch(function(){sstate.curSig=null;if(sstate.selected===key)cRenderVoucher(p,false);});
+  w.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function cRenderVoucher(p,loading){
+  var sig=sstate.curSig;
+  var amtTxt=(p.amount||0).toLocaleString("en-US");
+  var words_=p.amount>0?(words(p.amount)+" Dirhams Only"):"—";
+  var cell;
+  if(sig&&sig.img){
+    cell='<div class="signed"><span class="img"><img src="'+sig.img+'" alt="signature"></span>'+
+      '<span class="info"><span class="ok">✓ Received</span><span class="ts tnum">'+fmtTs(sig.ts)+'</span></span>'+
+      (state.canWrite?'<button class="redo" id="cRedo">redo</button>':'')+'</div>';
+  }else if(loading){
+    cell='<div class="signed"><span class="info"><span class="ts">loading…</span></span></div>';
+  }else{
+    cell='<button class="signbtn" id="cSignBtn"'+(state.canWrite?'':' disabled')+'>✎ Sign to confirm received</button>';
+  }
+  var eidField=p.eid?('<div class="field"><div class="k">Bearing EID No.</div><div class="v tnum">'+esc(p.eid)+'</div></div>'):'';
+  var html=''+
+  '<div class="voucher">'+
+    '<div class="v-head">'+
+      '<div class="lk"><img src="'+LOGO+'" alt="UXE"><span class="d"></span><span class="ss">SECURITY<span>SOLUTIONS</span></span></div>'+
+      '<div class="vt"><h2>'+scat.title+'</h2><div class="vno"><b>NO.</b> '+esc(p.no)+'</div></div>'+
+    '</div>'+
+    '<div class="v-rule"></div>'+
+    '<div class="v-strip">UXE SECURITY SOLUTIONS LLC &nbsp;·&nbsp; Dubai, United Arab Emirates &nbsp;·&nbsp; Emarat Al Aman Event &nbsp;·&nbsp; TRN: 100 XXXX XXXX 0003</div>'+
+    '<div class="v-body">'+
+      '<div class="sec-h">'+scat.signer+' &amp; Voucher Details</div>'+
+      '<div class="fields">'+
+        '<div class="field"><div class="k">Received By ('+scat.signer+')</div><div class="v name">'+esc(p.name)+'</div></div>'+
+        '<div class="field"><div class="k">Event</div><div class="v">Emarat Al Aman · 2–5 Nov 2026</div></div>'+
+        eidField+
+        '<div class="field"><div class="k">Amount</div><div class="v tnum">AED '+amtTxt+'.00</div></div>'+
+        '<div class="field full"><div class="k">Description</div><div class="v" style="font-weight:500">'+scat.descr+'</div></div>'+
+      '</div>'+
+      '<div class="sec-h mt">'+scat.section+'</div>'+
+      '<div class="days"><div class="days-h"><div>Item</div><div class="mid">Amount</div><div class="last">Signature — Received by '+scat.signer+'</div></div>'+
+        '<div class="drow">'+
+          '<div class="d-date"><span class="dow">'+scat.section+'</span><span class="dt tnum">'+esc(p.no)+'</span></div>'+
+          '<div class="d-rate tnum"><small>AED</small>'+amtTxt+'</div>'+
+          '<div class="d-sign">'+cell+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="totals">'+
+        '<div class="aiw"><div class="k">Amount in Words</div><div class="v">'+words_+'</div></div>'+
+        '<div class="totbox"><div class="k">Total '+scat.section+'<small>'+(sig&&sig.img?"signed":"1 signature required")+'</small></div><div class="amt"><small>AED</small>'+amtTxt+'.00</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="v-foot"><div class="sec-h">Authorisation</div>'+
+      '<div class="auth-h">'+APPROVERS.map(function(a){return '<div>'+a.label+'</div>'}).join('')+'</div>'+
+      '<div class="auth-b">'+APPROVERS.map(apprBlock).join('')+'</div>'+
+    '</div>'+
+    '<div class="v-note"><em>Digitally captured voucher — '+scat.signer.toLowerCase()+' signature recorded at the moment of signing. Prepared &amp; Approved signatures as authorised internally.</em><b>UXE · '+scat.titleUp+'</b></div>'+
+    '<div class="v-actions">'+
+      '<button class="btn pri" id="cExpOne">⬇ Export this voucher (PDF)</button>'+
+      '<button class="btn" id="cZipAll">\u{1F5C2} Download all vouchers (ZIP)</button>'+
+    '</div>'+
+  '</div>';
+  $("#catVoucherWrap").innerHTML=html;
+  var sb=$("#cSignBtn");if(sb)sb.onclick=cOpenSign;
+  var rb=$("#cRedo");if(rb)rb.onclick=cOpenSign;
+  var eo=$("#cExpOne");if(eo)eo.onclick=function(){cExportOne(p)};
+  var ez=$("#cZipAll");if(ez)ez.onclick=cZipAll;
+}
+function cOpenSign(){
+  if(!state.canWrite){toast("Signing is read-only for this viewer",true);return;}
+  var p=cFind(sstate.selected);if(!p)return;
+  openPad({mode:"cat",title:p.name.split(/\s+/).slice(0,2).join(" ")+" — "+scat.label,
+    sub:scat.section+" AED "+(p.amount||0).toLocaleString("en-US")+". Sign to confirm received.",
+    allowUpload:false,
+    onsave:function(url){cSave(p,url)}});
+}
+function cSave(p,url){
+  closePad();toast("Saving…");
+  cApi("POST","/sign/"+encodeURIComponent(p.key),{img:url}).then(function(){
+    sstate.curSig={img:url,ts:new Date().toISOString()};sstate.sigs[p.key]=sstate.curSig;
+    sstate.progress[p.key]={signed:true};
+    cRenderVoucher(p,false);cRenderList();cRenderDash();
+    toast("Signed ✓");
+  }).catch(function(e){toast(e&&e.code==="unauthorized"?"Session expired — log in again":"Couldn't save — try again",true);});
+}
+function cRenderDash(){
+  var signed=cSignedCount();
+  var paid=0;sstate.people.forEach(function(p){if(sstate.progress[p.key])paid+=p.amount||0;});
+  $("#catDashK").textContent=signed+" of "+sstate.people.length+" "+scat.signer.toLowerCase()+"s signed · payable";
+  $("#catPayTotal").textContent="AED "+paid.toLocaleString("en-US");
+}
+/* ---- single-sig PDF (UXE template) ---- */
+function cBuildPdfDoc(list){
+  var jsPDF=window.jspdf&&window.jspdf.jsPDF;if(!jsPDF){toast("PDF engine not loaded",true);return null;}
+  var doc=new jsPDF({unit:"pt",format:"a4"});
+  var pw=doc.internal.pageSize.getWidth();var M=46,x0=M,W=pw-M*2;
+  function fc(c){doc.setFillColor(c[0],c[1],c[2]);}function tc(c){doc.setTextColor(c[0],c[1],c[2]);}function dc(c){doc.setDrawColor(c[0],c[1],c[2]);}
+  function sect(t,y){fc(CLR.orange);doc.rect(x0,y-6,6,6,"F");doc.setFont("helvetica","bold");doc.setFontSize(8.5);tc(CLR.ink);doc.text(t.toUpperCase(),x0+11,y,{charSpace:.9});}
+  list.forEach(function(p,idx){
+    if(idx>0)doc.addPage();
+    var sig=(p.key===sstate.selected&&sstate.curSig)?sstate.curSig:(sstate.sigs[p.key]||null);
+    var amt=p.amount||0;
+    // header
+    fc(CLR.navy);doc.rect(0,0,pw,64,"F");
+    try{doc.addImage(LOGO,"PNG",M,22,56,20);}catch(e){}
+    dc([255,255,255]);doc.setLineWidth(.6);if(doc.setGState)doc.setGState(new doc.GState({opacity:.32}));
+    doc.line(M+67,23,M+67,43);if(doc.setGState)doc.setGState(new doc.GState({opacity:1}));
+    doc.setFont("helvetica","bold");doc.setFontSize(7);tc(CLR.white);
+    doc.text("SECURITY",M+76,31,{charSpace:1.7});doc.text("SOLUTIONS",M+76,40,{charSpace:1.7});
+    doc.setFont("helvetica","bold");doc.setFontSize(12.5);tc(CLR.white);
+    doc.text(scat.titleUp,pw-M,33,{align:"right",charSpace:.7});
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    var noTxt=p.no,gap="  ",noW=doc.getTextWidth("NO."+gap+noTxt),pillW=noW+18,pillX=pw-M-pillW,pillY=45;
+    dc(CLR.orange);doc.setLineWidth(1);doc.roundedRect(pillX,pillY,pillW,13,6.5,6.5,"S");
+    tc(CLR.orange);doc.text("NO.",pillX+9,pillY+8.8);tc(CLR.white);doc.text(noTxt,pillX+9+doc.getTextWidth("NO."+gap),pillY+8.8);
+    fc(CLR.orange);doc.rect(0,64,pw,3,"F");
+    fc(CLR.light);doc.rect(0,67,pw,15,"F");
+    doc.setFont("helvetica","normal");doc.setFontSize(6.8);tc(CLR.ink);
+    doc.text("UXE SECURITY SOLUTIONS LLC    ·    Dubai, United Arab Emirates    ·    Emarat Al Aman Event    ·    TRN: 100 XXXX XXXX 0003",pw/2,77,{align:"center"});
+    var y=104;
+    sect(scat.signer+" & Voucher Details",y);y+=13;
+    var colGap=22,colW=(W-colGap)/2,rx=x0+colW+colGap;
+    function field(fx,k,val,yy,fw){doc.setFont("helvetica","normal");doc.setFontSize(6.8);tc(CLR.grey);
+      doc.text(k.toUpperCase(),fx,yy,{charSpace:.5});
+      doc.setFont("helvetica","bold");doc.setFontSize(9.5);tc(CLR.ink);
+      doc.text(String(val),fx,yy+12,{maxWidth:fw||colW});
+      dc(CLR.hair);doc.setLineWidth(.5);doc.line(fx,yy+16,fx+(fw||colW),yy+16);}
+    field(x0,"Received By ("+scat.signer+")",p.name,y,colW);field(rx,"Event","Emarat Al Aman · 2–5 Nov 2026",y,colW);y+=30;
+    field(x0,"Bearing EID No.",p.eid||"—",y,colW);field(rx,"Amount","AED "+amt.toLocaleString("en-US")+".00",y,colW);y+=28;
+    doc.setFont("helvetica","normal");doc.setFontSize(6.8);tc(CLR.grey);doc.text("DESCRIPTION",x0,y,{charSpace:.5});
+    doc.setFont("helvetica","normal");doc.setFontSize(8.5);tc(CLR.ink);
+    doc.text(scat.descr,x0,y+11,{maxWidth:W});y+=24;
+    dc(CLR.hair);doc.setLineWidth(.5);doc.line(x0,y,x0+W,y);y+=18;
+    sect(scat.section,y);y+=11;
+    var c1=W*0.37,c2=58,rowH=52;
+    fc(CLR.navy);doc.rect(x0,y,W,15,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(6.8);tc(CLR.white);
+    doc.text("ITEM",x0+9,y+10,{charSpace:.6});doc.text("AMOUNT",x0+c1+9,y+10,{charSpace:.6});
+    doc.text("SIGNATURE — RECEIVED BY "+scat.signer.toUpperCase(),x0+c1+c2+9,y+10,{charSpace:.6});y+=15;
+    dc(CLR.hair);doc.setLineWidth(.5);doc.rect(x0,y,W,rowH);
+    doc.line(x0+c1,y,x0+c1,y+rowH);doc.line(x0+c1+c2,y,x0+c1+c2,y+rowH);
+    doc.setFont("helvetica","bold");doc.setFontSize(9.5);tc(CLR.ink);doc.text(scat.section,x0+9,y+20,{maxWidth:c1-16});
+    doc.setFont("helvetica","normal");doc.setFontSize(7.5);tc(CLR.grey);doc.text(p.no,x0+9,y+34);
+    doc.setFont("helvetica","bold");doc.setFontSize(9.5);tc(CLR.ink);doc.text("AED "+amt.toLocaleString("en-US"),x0+c1+9,y+30);
+    if(sig&&sig.img){try{doc.addImage(sig.img,"PNG",x0+c1+c2+12,y+9,150,32);}catch(e){}
+      doc.setFont("helvetica","normal");doc.setFontSize(6.3);tc(CLR.grey);doc.text("Received "+fmtTs(sig.ts),x0+c1+c2+12,y+rowH-6);}
+    else{doc.setFont("helvetica","italic");doc.setFontSize(8);tc(CLR.danger);doc.text("not signed",x0+c1+c2+12,y+30);}
+    y+=rowH+16;
+    var tW=(W-12)/2,tbH=44;
+    fc(CLR.light);doc.rect(x0,y,tW,tbH,"F");fc(CLR.orange);doc.rect(x0,y,3,tbH,"F");
+    doc.setFont("helvetica","normal");doc.setFontSize(6.8);tc(CLR.grey);doc.text("AMOUNT IN WORDS",x0+11,y+14,{charSpace:.5});
+    doc.setFont("helvetica","bolditalic");doc.setFontSize(9.5);tc(CLR.ink);
+    doc.text(amt>0?(words(amt)+" Dirhams Only"):"—",x0+11,y+28,{maxWidth:tW-20});
+    var bx=x0+tW+12;fc(CLR.navy);doc.rect(bx,y,tW,tbH,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(7);tc(CLR.white);doc.text("TOTAL "+scat.section.toUpperCase(),bx+12,y+15,{charSpace:.5});
+    doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.setTextColor(190,200,220);doc.text(sig&&sig.img?"signed · received":"1 signature required",bx+12,y+25);
+    doc.setFont("helvetica","bold");doc.setFontSize(15.5);tc(CLR.white);
+    doc.text("AED "+amt.toLocaleString("en-US")+".00",bx+tW-12,y+31,{align:"right"});
+    y+=tbH+18;
+    sect("Authorisation",y);y+=11;
+    var third=W/3;
+    fc(CLR.navy);doc.rect(x0,y,W,17,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(7);tc(CLR.white);
+    APPROVERS.forEach(function(a,i){doc.text(a.label.toUpperCase(),x0+i*third+10,y+11,{charSpace:.5});});
+    dc([255,255,255]);if(doc.setGState)doc.setGState(new doc.GState({opacity:.2}));
+    doc.line(x0+third,y,x0+third,y+17);doc.line(x0+2*third,y,x0+2*third,y+17);if(doc.setGState)doc.setGState(new doc.GState({opacity:1}));
+    y+=17;var bh=58;
+    dc(CLR.hair);doc.setLineWidth(.5);doc.rect(x0,y,W,bh);doc.line(x0+third,y,x0+third,y+bh);doc.line(x0+2*third,y,x0+2*third,y+bh);
+    APPROVERS.forEach(function(a,i){
+      var ax=x0+i*third+10;var o=state.approvers&&state.approvers[a.role];var img=(o&&o.img)?o.img:a.sig;
+      if(img){var hh=22,ww=hh*a.ar,maxw=third-22;if(ww>maxw){ww=maxw;hh=ww/a.ar;}try{doc.addImage(img,"PNG",ax,y+32-hh,ww,hh);}catch(e){}}
+      dc(CLR.ink);doc.setLineWidth(.6);doc.line(ax,y+34,ax+third-18,y+34);
+      doc.setFont("helvetica","bold");doc.setFontSize(8.3);tc(CLR.ink);doc.text(a.title,ax,y+46,{maxWidth:third-16});
+      doc.setFont("helvetica","italic");doc.setFontSize(7);tc(CLR.grey);doc.text("Signature | Date",ax,y+55);
+    });
+    y+=bh+18;
+    dc(CLR.hair);doc.setLineWidth(.5);doc.line(x0,y,x0+W,y);y+=11;
+    doc.setFont("helvetica","italic");doc.setFontSize(7);tc(CLR.grey);
+    doc.text("Digitally captured voucher — "+scat.signer.toLowerCase()+" signature recorded at the moment of signing.",x0,y);
+    doc.setFont("helvetica","bold");tc(CLR.grey);doc.text("UXE · "+scat.titleUp,x0+W,y,{align:"right",charSpace:.4});
+  });
+  return doc;
+}
+function cExportOne(p){
+  var doc=cBuildPdfDoc([p]);if(!doc)return;
+  try{doc.save("Voucher_"+p.no+".pdf");toast("PDF ready — check your downloads");}
+  catch(e){try{window.open(doc.output("bloburl"),"_blank");}catch(e2){toast("Could not open PDF",true);}}
+}
+function cGatherSigs(){
+  return Promise.all(sstate.people.map(function(p){
+    if(p.key===sstate.selected&&sstate.curSig){sstate.sigs[p.key]=sstate.curSig;return Promise.resolve();}
+    if(sstate.sigs[p.key]!==undefined&&!sstate.progress[p.key])return Promise.resolve();
+    if(sstate.sigs[p.key])return Promise.resolve();
+    if(!sstate.progress[p.key]){sstate.sigs[p.key]=null;return Promise.resolve();}
+    return cApi("GET","/sig/"+encodeURIComponent(p.key)).then(function(d){sstate.sigs[p.key]=(d&&d.img)?d:null;}).catch(function(){sstate.sigs[p.key]=null;});
+  }));
+}
+function cZipFileName(p,used){
+  var base=p.name.replace(/[\\/:*?"<>|]+/g,"").replace(/\s+/g," ").trim();
+  var fn=base+".pdf";if(used[fn]){fn=base+" ("+p.no+").pdf";}used[fn]=1;return fn;
+}
+function cZipAll(){
+  if(!window.JSZip){toast("ZIP library still loading — try again",true);return;}
+  toast("Building "+sstate.people.length+" vouchers…");
+  cGatherSigs().then(function(){
+    var zip=new JSZip(),used={};
+    sstate.people.forEach(function(p){var doc=cBuildPdfDoc([p]);if(!doc)return;zip.file(cZipFileName(p,used),doc.output("arraybuffer"));});
+    return zip.generateAsync({type:"blob"});
+  }).then(function(blob){
+    if(!blob)return;
+    var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="EAA_"+scat.label.replace(/\s+/g,"_")+"_Vouchers.zip";
+    document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},5000);
+    toast("ZIP downloaded ✓");
+  }).catch(function(e){toast("ZIP failed",true);});
+}
+/* menu wiring */
+$("#back").addEventListener("click",showMenu);
+$("#catSearch").addEventListener("input",cRenderList);
+$("#catClr").addEventListener("click",function(){$("#catSearch").value="";cRenderList();$("#catSearch").focus();});
+
 /* ---------------- wire static UI ---------------- */
 $("#search").addEventListener("input",renderList);
 $("#clr").addEventListener("click",function(){$("#search").value="";renderList();$("#search").focus();});
@@ -1131,12 +1508,15 @@ function startPoll(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval
 function openApp(code){
   CODE=code;
   $("#loginOv").classList.remove("show");
-  loadData();startPoll();
+  showMenu();
 }
 function logout(){
   CODE="";
   if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
-  state.selected=null;$("#voucherWrap").style.display="none";
+  state.selected=null;sstate.selected=null;cStopPoll();
+  $("#voucherWrap").style.display="none";
+  $("#menu").hidden=true;$("#catApp").hidden=true;$("#foodApp").hidden=true;
+  $("#foodCtrl").hidden=true;$("#gear").hidden=true;$("#back").hidden=true;
   $("#codeErr").hidden=true;$("#codeInp").value="";$("#loginOv").classList.add("show");
   setTimeout(function(){try{$("#codeInp").focus();}catch(e){}},50);
 }
